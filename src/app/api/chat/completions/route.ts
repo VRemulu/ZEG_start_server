@@ -4,6 +4,7 @@ import { retrieveFromRagflow } from '@/lib/rag/ragflow';
 import OpenAI from 'openai';
 import type { ChatCompletionCreateParams } from 'openai/resources/chat';
 import { retrieveFromBailian } from '@/lib/rag/bailian';
+import { sanitizeSpeechText } from '@/lib/plain-text';
 
 
 export async function POST(request: NextRequest) {
@@ -96,6 +97,10 @@ export async function POST(request: NextRequest) {
                 for await (const chunk of completion) {
                     // 注意⚠️：AIAgent 要求最后一个有效数据必须包含 "finish_reason":"stop"且最后必须发送一条结束数据：data: [DONE]，如果不发送可能会导致智能体不回答或者回答不完整。
                     // 某些模型不会在流式响应中返回 finish_reason，这种情况需要自己根据修改一下chunk内容再传回给 AIAgent。
+                    const content = chunk.choices?.[0]?.delta?.content;
+                    if (typeof content === 'string') {
+                        chunk.choices[0].delta.content = sanitizeSpeechText(content);
+                    }
                     const ssePart = `data: ${JSON.stringify(chunk)}\n`;
                     writer.write(encoder.encode(ssePart));
                 }
