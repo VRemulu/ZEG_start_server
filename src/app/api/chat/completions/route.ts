@@ -51,13 +51,16 @@ export async function POST(request: NextRequest) {
             // 同时你也可以通过这个值传递一些额外的业务信息。比如带上用户的信息、等级、偏好等等。然后依此再调用 LLM 时针对性的修改实际给 LLM 的 SystemPrompt。
             const systemMessage = requestData.messages.find(message => message.role === 'system');
 
-            // 读取最新一条 User Message（最新的在数组最后）
-            // AIAgent 在向你的接口发起请求时，会带上 Messages 参数。这个参数也包括 SystemPrompt。
-            const latestUserMessage = [...requestData.messages].reverse().find(message => message.role === 'user');
-            const latestUserQuestion = typeof latestUserMessage?.content === 'string'
-                ? latestUserMessage.content
-                : '';
-            const answerRoute = routeQuestion(latestUserQuestion);
+            // 读取用户历史与最新 User Message，合成包含多轮上下文的完整检索 Query
+            // 解决多轮追问（如："养老APP项目。" -> "项目负责人是谁？"）时因最新一句话缺失项目主体导致检索到其他项目资料的问题
+            const userMessages = requestData.messages
+                .filter(message => message.role === 'user' && typeof message.content === 'string')
+                .map(message => (message.content as string).trim())
+                .filter(Boolean);
+
+            const latestUserQuestion = userMessages[userMessages.length - 1] || '';
+            const fullContextQuery = userMessages.slice(-3).join(' ');
+            const answerRoute = routeQuestion(fullContextQuery || latestUserQuestion);
 
             // 读取其他符合 OpenAI 协议的 LLM 参数类似，这里不再赘述。
 
@@ -68,16 +71,18 @@ export async function POST(request: NextRequest) {
             try {
                 let kbContent = "";
                 const shouldRetrieveEnterpriseKb = answerRoute === 'enterprise_kb';
+                const retrievalQuery = fullContextQuery || latestUserQuestion;
+
                 // 调用知识库查询接口，获取知识库查询结果
                 if (shouldRetrieveEnterpriseKb && process.env.KB_TYPE === "ragflow") {
-                    console.log("调用 Ragflow 知识库查询接口");
+                    console.log("调用 Ragflow 知识库查询接口:", retrievalQuery);
                     const ragflowResponse = await retrieveFromRagflow({
-                        question: latestUserQuestion,
+                        question: retrievalQuery,
                     });
                     kbContent = ragflowResponse.kbContent;
                 } else if (shouldRetrieveEnterpriseKb && process.env.KB_TYPE === "bailian") {
-                    console.log("调用 Bailian 知识库查询接口");
-                    const bailianResponse = await retrieveFromBailian({ query: latestUserQuestion });
+                    console.log("调用 Bailian 知识库查询接口:", retrievalQuery);
+                    const bailianResponse = await retrieveFromBailian({ query: retrievalQuery });
                     kbContent = bailianResponse.kbContent;
                 }
 
