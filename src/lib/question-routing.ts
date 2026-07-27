@@ -1,29 +1,16 @@
 export type AnswerRoute = 'enterprise_kb' | 'general';
 
-// 预设高置信度企业关键词模式（包含对科小/柯小、售前、能力申报等业务场景支持）
-const DEFAULT_ENTERPRISE_PATTERNS: RegExp[] = [
-  /嘉信讯通/i,
-  /(?:我司|本公司|我们公司)/,
-  /合同(?:金额|编号|日期|信息|内容|签订|付款)/,
-  /发票(?:信息|号码|金额|日期|抬头|税号)?/,
-  /客户(?:名称|信息|资料)/,
-  /验收(?:情况|日期|报告|结果)?/,
-  /中标(?:金额|信息|项目)?/,
-  /(?:回款|付款)(?:情况|进度|金额)?/,
-  /(?:项目).*(?:合同|金额|客户|验收|交付)/,
-  /(?:合同|客户|验收|交付).*(?:项目)/,
-  /信访一网通办/,
-  /党建引领/,
-  /大气污染源管理/,
-  /[科柯]小/,           // 支持"科小"与同音字"柯小"
-  /能力申报/,          // 支持"能力申报"类业务查询
-  /售前/,              // 支持售前项目查询
-  /青岛瑞宏/,          // 支持客户名称
+// 明确的通用闲聊/文旅/无意图黑名单模式（只有命中这些时才跳过知识库）
+const GENERAL_EXCLUDE_PATTERNS: RegExp[] = [
+  /栈桥/,
+  /景点|景区|旅游|门票|交通管制|路线规划/,
+  /天气|温度|下雨|预报/,
+  /讲个?笑话|唱歌|翻译成/,
 ];
 
 /**
  * 错别字与同音字自动归一化映射。
- * 可通过环境变量 ASR_CORRECTIONS 配置，格式如："柯小:科小,瑞鸿:瑞宏,嘉信迅通:嘉信讯通"
+ * 支持通过环境变量 ASR_CORRECTIONS 动态配置，格式："柯小:科小,瑞鸿:瑞宏"
  */
 export function getAsrCorrections(env: NodeJS.ProcessEnv = process.env): Array<[RegExp, string]> {
   const envCorrections = env.ASR_CORRECTIONS;
@@ -61,44 +48,20 @@ export function normalizeQuestion(question: string, env: NodeJS.ProcessEnv = pro
 }
 
 /**
- * 获取所有的企业业务匹配模式。
- * 支持通过环境变量 ENTERPRISE_KEYWORDS 动态补充关键词（逗号分隔）。
- */
-export function getEnterprisePatterns(env: NodeJS.ProcessEnv = process.env): RegExp[] {
-  const patterns = [...DEFAULT_ENTERPRISE_PATTERNS];
-
-  const customKeywords = env.ENTERPRISE_KEYWORDS;
-  if (customKeywords && customKeywords.trim()) {
-    const keywords = customKeywords
-      .split(',')
-      .map((k) => k.trim())
-      .filter(Boolean);
-
-    for (const kw of keywords) {
-      // 避免重复添加
-      try {
-        const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        patterns.push(new RegExp(escaped, 'i'));
-      } catch (err) {
-        console.warn(`[question-routing] 无效的环境变量关键词: "${kw}"`, err);
-      }
-    }
-  }
-
-  return patterns;
-}
-
-/**
- * Uses high-confidence business phrases to decide whether an enterprise
- * knowledge-base lookup is appropriate.
+ * 【零维护架构】路由判定：
+ * 除非明确命中“通用闲聊/文旅黑名单”，否则所有提问（包含未来新增的所有项目与文件）
+ * 一律默认允许进入百炼知识库检索，由百炼 Rerank 重排得分门禁自动鉴别召回！
  */
 export function routeQuestion(question: string, env: NodeJS.ProcessEnv = process.env): AnswerRoute {
   const normalizedQuestion = normalizeQuestion(question, env);
-  const patterns = getEnterprisePatterns(env);
 
-  return patterns.some((pattern) => pattern.test(normalizedQuestion))
-    ? 'enterprise_kb'
-    : 'general';
+  // 1. 命中闲聊黑名单的跳过检索
+  if (GENERAL_EXCLUDE_PATTERNS.some((pattern) => pattern.test(normalizedQuestion))) {
+    return 'general';
+  }
+
+  // 2. 默认全量开启知识库检索，实现无需手动添加关键词的零维护体验
+  return 'enterprise_kb';
 }
 
 export function buildRoutedUserContent(

@@ -1,44 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-test('routes Qingdao Zhanqiao and other general questions away from the enterprise KB', async () => {
+test('routes Qingdao Zhanqiao, weather and chat questions to general route via exclude patterns', async () => {
   const { routeQuestion } = await import('./question-routing.ts');
 
   assert.equal(routeQuestion('对，说一下青岛的栈桥。'), 'general');
+  assert.equal(routeQuestion('今天天气怎么样？'), 'general');
   assert.equal(routeQuestion('讲个笑话'), 'general');
-  assert.equal(routeQuestion('这个旅游项目有什么特色？'), 'general');
-  assert.equal(routeQuestion('介绍一家科技公司'), 'general');
+  assert.equal(routeQuestion('翻译成英文'), 'general');
 });
 
-test('routes high-confidence internal business questions to the enterprise KB', async () => {
-  const { routeQuestion } = await import('./question-routing.ts');
-
-  assert.equal(routeQuestion('青岛嘉信讯通信息有限公司有哪些项目？'), 'enterprise_kb');
-  assert.equal(routeQuestion('这个项目的合同金额是多少？'), 'enterprise_kb');
-  assert.equal(routeQuestion('查询一下发票信息'), 'enterprise_kb');
-  assert.equal(routeQuestion('客户名称和验收情况是什么？'), 'enterprise_kb');
-});
-
-test('routes "科小能力申报" and homophone ASR variant "柯小能力申报" to enterprise KB', async () => {
+test('Zero-Maintenance architecture: all new projects, companies and short phrases route to enterprise KB by default', async () => {
   const { routeQuestion, normalizeQuestion } = await import('./question-routing.ts');
 
-  assert.equal(normalizeQuestion('柯小能力申报'), '科小能力申报');
+  // 新增项目名称与极简短语，无需配置任何关键词即可自动路由至 enterprise_kb
+  assert.equal(routeQuestion('军舰数字孪生'), 'enterprise_kb');
+  assert.equal(routeQuestion('医院送药吹气管道'), 'enterprise_kb');
+  assert.equal(routeQuestion('养老APP项目'), 'enterprise_kb');
   assert.equal(routeQuestion('科小能力申报'), 'enterprise_kb');
+  assert.equal(routeQuestion('未来上传的任意新文件项目名称'), 'enterprise_kb');
+  assert.equal(normalizeQuestion('柯小能力申报'), '科小能力申报');
   assert.equal(routeQuestion('柯小能力申报'), 'enterprise_kb');
-  assert.equal(routeQuestion('科小能力申报。'), 'enterprise_kb');
-  assert.equal(routeQuestion('关于售前项目一览'), 'enterprise_kb');
-});
-
-test('supports dynamic enterprise keywords from environment variable', async () => {
-  const { routeQuestion } = await import('./question-routing.ts');
-
-  const customEnv = { ENTERPRISE_KEYWORDS: '自定义特有项目名,某些私有关键词' };
-  assert.equal(routeQuestion('自定义特有项目名', customEnv), 'enterprise_kb');
-  assert.equal(routeQuestion('某些私有关键词', customEnv), 'enterprise_kb');
 });
 
 test('supports dynamic ASR corrections from environment variable', async () => {
-  const { normalizeQuestion, routeQuestion } = await import('./question-routing.ts');
+  const { normalizeQuestion } = await import('./question-routing.ts');
 
   const customEnv = { ASR_CORRECTIONS: '错别词:正确词' };
   assert.equal(normalizeQuestion('这是一个错别词测试', customEnv), '这是一个正确词测试');
@@ -61,13 +47,13 @@ test('builds a general answer request without enterprise reference material', as
 test('builds a grounded enterprise answer request with retrieved content', async () => {
   const { buildRoutedUserContent } = await import('./question-routing.ts');
   const content = buildRoutedUserContent(
-    '项目合同金额是多少？',
+    '军舰数字孪生负责人是谁？',
     'enterprise_kb',
-    '合同金额：100 万元',
+    '项目名称:军舰数字孪生 项目负责人:刘元甲,王新',
   );
 
   assert.match(content, /只能根据参考资料回答/);
-  assert.match(content, /合同金额：100 万元/);
+  assert.match(content, /项目负责人:刘元甲,王新/);
   assert.match(content, /不得编造/);
 });
 
