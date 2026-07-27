@@ -1,6 +1,7 @@
 export type AnswerRoute = 'enterprise_kb' | 'general';
 
-const ENTERPRISE_PATTERNS: RegExp[] = [
+// 预设高置信度企业关键词模式（包含对科小/柯小、售前、能力申报等业务场景支持）
+const DEFAULT_ENTERPRISE_PATTERNS: RegExp[] = [
   /嘉信讯通/i,
   /(?:我司|本公司|我们公司)/,
   /合同(?:金额|编号|日期|信息|内容|签订|付款)/,
@@ -14,17 +15,88 @@ const ENTERPRISE_PATTERNS: RegExp[] = [
   /信访一网通办/,
   /党建引领/,
   /大气污染源管理/,
+  /[科柯]小/,           // 支持"科小"与同音字"柯小"
+  /能力申报/,          // 支持"能力申报"类业务查询
+  /售前/,              // 支持售前项目查询
+  /青岛瑞宏/,          // 支持客户名称
 ];
 
 /**
- * Uses high-confidence business phrases to decide whether an enterprise
- * knowledge-base lookup is appropriate. Ambiguous questions default to the
- * general route so unrelated internal documents are never injected.
+ * 错别字与同音字自动归一化映射。
+ * 可通过环境变量 ASR_CORRECTIONS 配置，格式如："柯小:科小,瑞鸿:瑞宏,嘉信迅通:嘉信讯通"
  */
-export function routeQuestion(question: string): AnswerRoute {
-  const normalizedQuestion = question.trim();
+export function getAsrCorrections(env: NodeJS.ProcessEnv = process.env): Array<[RegExp, string]> {
+  const envCorrections = env.ASR_CORRECTIONS;
+  const list: Array<[RegExp, string]> = [
+    [/柯小/g, '科小'],
+    [/瑞鸿/g, '瑞宏'],
+    [/嘉信迅通/g, '嘉信讯通'],
+  ];
 
-  return ENTERPRISE_PATTERNS.some((pattern) => pattern.test(normalizedQuestion))
+  if (envCorrections && envCorrections.trim()) {
+    const pairs = envCorrections.split(',');
+    for (const pair of pairs) {
+      const [wrong, right] = pair.split(':').map((s) => s.trim());
+      if (wrong && right) {
+        list.push([new RegExp(wrong, 'g'), right]);
+      }
+    }
+  }
+
+  return list;
+}
+
+/**
+ * 对输入提问进行错别字/同音词纠错归一化处理
+ */
+export function normalizeQuestion(question: string, env: NodeJS.ProcessEnv = process.env): string {
+  let normalized = question.trim();
+  const corrections = getAsrCorrections(env);
+
+  for (const [pattern, replacement] of corrections) {
+    normalized = normalized.replace(pattern, replacement);
+  }
+
+  return normalized;
+}
+
+/**
+ * 获取所有的企业业务匹配模式。
+ * 支持通过环境变量 ENTERPRISE_KEYWORDS 动态补充关键词（逗号分隔）。
+ */
+export function getEnterprisePatterns(env: NodeJS.ProcessEnv = process.env): RegExp[] {
+  const patterns = [...DEFAULT_ENTERPRISE_PATTERNS];
+
+  const customKeywords = env.ENTERPRISE_KEYWORDS;
+  if (customKeywords && customKeywords.trim()) {
+    const keywords = customKeywords
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean);
+
+    for (const kw of keywords) {
+      // 避免重复添加
+      try {
+        const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        patterns.push(new RegExp(escaped, 'i'));
+      } catch (err) {
+        console.warn(`[question-routing] 无效的环境变量关键词: "${kw}"`, err);
+      }
+    }
+  }
+
+  return patterns;
+}
+
+/**
+ * Uses high-confidence business phrases to decide whether an enterprise
+ * knowledge-base lookup is appropriate.
+ */
+export function routeQuestion(question: string, env: NodeJS.ProcessEnv = process.env): AnswerRoute {
+  const normalizedQuestion = normalizeQuestion(question, env);
+  const patterns = getEnterprisePatterns(env);
+
+  return patterns.some((pattern) => pattern.test(normalizedQuestion))
     ? 'enterprise_kb'
     : 'general';
 }

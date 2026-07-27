@@ -392,4 +392,42 @@ export class ZegoAIAgent {
         console.log("list agents result", result);
         return result;
     }
+
+    async sendAgentInstanceTTS(
+        agentInstanceId: string,
+        text: string,
+        priority: 'Low' | 'Medium' | 'High' = 'High',
+        samePriorityOption: 'ClearAndInterrupt' | 'Enqueue' = 'ClearAndInterrupt'
+    ) {
+        // https://aigc-aiagent-api.zegotech.cn?Action=SendAgentInstanceTTS
+        const action = 'SendAgentInstanceTTS';
+        const body = {
+            AgentInstanceId: agentInstanceId,
+            Text: text,
+            Priority: priority,
+            SamePriorityOption: samePriorityOption
+        };
+        const result = await this.sendRequest<any>(action, body);
+        console.log("sendAgentInstanceTTS result", result);
+        return result;
+    }
+
+    async sendAgentInstanceLLM(
+        agentInstanceId: string,
+        text: string,
+        priority: 'Low' | 'Medium' | 'High' = 'Medium',
+        samePriorityOption: 'ClearAndInterrupt' | 'Enqueue' = 'ClearAndInterrupt'
+    ) {
+        // https://aigc-aiagent-api.zegotech.cn?Action=SendAgentInstanceLLM
+        const action = 'SendAgentInstanceLLM';
+        const body = {
+            AgentInstanceId: agentInstanceId,
+            Text: text,
+            Priority: priority,
+            SamePriorityOption: samePriorityOption
+        };
+        const result = await this.sendRequest<any>(action, body);
+        console.log("sendAgentInstanceLLM result", result);
+        return result;
+    }
 }

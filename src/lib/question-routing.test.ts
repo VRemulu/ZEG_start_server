@@ -19,6 +19,31 @@ test('routes high-confidence internal business questions to the enterprise KB', 
   assert.equal(routeQuestion('客户名称和验收情况是什么？'), 'enterprise_kb');
 });
 
+test('routes "科小能力申报" and homophone ASR variant "柯小能力申报" to enterprise KB', async () => {
+  const { routeQuestion, normalizeQuestion } = await import('./question-routing.ts');
+
+  assert.equal(normalizeQuestion('柯小能力申报'), '科小能力申报');
+  assert.equal(routeQuestion('科小能力申报'), 'enterprise_kb');
+  assert.equal(routeQuestion('柯小能力申报'), 'enterprise_kb');
+  assert.equal(routeQuestion('科小能力申报。'), 'enterprise_kb');
+  assert.equal(routeQuestion('关于售前项目一览'), 'enterprise_kb');
+});
+
+test('supports dynamic enterprise keywords from environment variable', async () => {
+  const { routeQuestion } = await import('./question-routing.ts');
+
+  const customEnv = { ENTERPRISE_KEYWORDS: '自定义特有项目名,某些私有关键词' };
+  assert.equal(routeQuestion('自定义特有项目名', customEnv), 'enterprise_kb');
+  assert.equal(routeQuestion('某些私有关键词', customEnv), 'enterprise_kb');
+});
+
+test('supports dynamic ASR corrections from environment variable', async () => {
+  const { normalizeQuestion, routeQuestion } = await import('./question-routing.ts');
+
+  const customEnv = { ASR_CORRECTIONS: '错别词:正确词' };
+  assert.equal(normalizeQuestion('这是一个错别词测试', customEnv), '这是一个正确词测试');
+});
+
 test('builds a general answer request without enterprise reference material', async () => {
   const { buildRoutedUserContent } = await import('./question-routing.ts');
   const content = buildRoutedUserContent(
