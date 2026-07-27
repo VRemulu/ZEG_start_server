@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ZegoAIAgent } from '@/lib/zego/aiagent';
 
-export async function GET() {
+async function handleGetDigitalHumanList() {
   try {
     const assistant = ZegoAIAgent.getInstance();
     const result = await assistant.getDigitalHumanList();
@@ -18,7 +18,6 @@ export async function GET() {
     return NextResponse.json({ code: 0, message: '获取成功', data: formattedList }, { status: 200 });
   } catch (error: any) {
     console.error('[digital-human-list] 获取列表失败:', error);
-    // 返回默认降级列表，确保前端随时可用
     return NextResponse.json(
       {
         code: 0,
@@ -32,13 +31,21 @@ export async function GET() {
   }
 }
 
+export async function GET() {
+  return handleGetDigitalHumanList();
+}
+
+export async function POST() {
+  return handleGetDigitalHumanList();
+}
+
 export async function OPTIONS() {
   return NextResponse.json(
     {},
     {
       headers: {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       },
     }
