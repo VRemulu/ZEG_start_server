@@ -5,6 +5,7 @@ import OpenAI from 'openai';
 import type { ChatCompletionCreateParams } from 'openai/resources/chat';
 import { retrieveFromBailian } from '@/lib/rag/bailian';
 import { sanitizeSpeechText } from '@/lib/plain-text';
+import { buildRoutedUserContent, routeQuestion } from '@/lib/question-routing';
 
 
 export async function POST(request: NextRequest) {
@@ -53,6 +54,10 @@ export async function POST(request: NextRequest) {
             // 读取最新一条 User Message（最新的在数组最后）
             // AIAgent 在向你的接口发起请求时，会带上 Messages 参数。这个参数也包括 SystemPrompt。
             const latestUserMessage = [...requestData.messages].reverse().find(message => message.role === 'user');
+            const latestUserQuestion = typeof latestUserMessage?.content === 'string'
+                ? latestUserMessage.content
+                : '';
+            const answerRoute = routeQuestion(latestUserQuestion);
 
             // 读取其他符合 OpenAI 协议的 LLM 参数类似，这里不再赘述。
 
@@ -62,16 +67,17 @@ export async function POST(request: NextRequest) {
             const encoder = new TextEncoder();
             try {
                 let kbContent = "";
+                const shouldRetrieveEnterpriseKb = answerRoute === 'enterprise_kb';
                 // 调用知识库查询接口，获取知识库查询结果
-                if (process.env.KB_TYPE === "ragflow") {
+                if (shouldRetrieveEnterpriseKb && process.env.KB_TYPE === "ragflow") {
                     console.log("调用 Ragflow 知识库查询接口");
                     const ragflowResponse = await retrieveFromRagflow({
-                        question: latestUserMessage?.content as string,
+                        question: latestUserQuestion,
                     });
                     kbContent = ragflowResponse.kbContent;
-                } else if (process.env.KB_TYPE === "bailian") {
+                } else if (shouldRetrieveEnterpriseKb && process.env.KB_TYPE === "bailian") {
                     console.log("调用 Bailian 知识库查询接口");
-                    const bailianResponse = await retrieveFromBailian({ query: latestUserMessage?.content as string });
+                    const bailianResponse = await retrieveFromBailian({ query: latestUserQuestion });
                     kbContent = bailianResponse.kbContent;
                 }
 
@@ -79,7 +85,7 @@ export async function POST(request: NextRequest) {
                 // 小提示🔔：部分厂商的模型是提供上下文硬盘缓存的，所以计算价格时有缓存的计价会便宜很多。保持 SystemPrompt 不变，只替换 User Message 可有效提升缓存命中概率从而降低成本并且缩短推理时间。
                 requestData.messages[requestData.messages.length - 1] = {
                     role: 'user',
-                    content: `${latestUserMessage?.content}\n以下是知识库查询结果:\n${kbContent}`,
+                    content: buildRoutedUserContent(latestUserQuestion, answerRoute, kbContent),
                 };
 
                 // 调用 LLM 进行回答（使用 OpenAI 的 SDK）
