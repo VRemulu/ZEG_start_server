@@ -430,4 +430,28 @@ export class ZegoAIAgent {
         console.log("sendAgentInstanceLLM result", result);
         return result;
     }
+
+    async getDigitalHumanList() {
+        // https://aigc-digitalhuman-api.zegotech.cn?Action=GetDigitalHumanList
+        const action = 'GetDigitalHumanList';
+        try {
+            const result = await this.sendRequest<any>(
+                action,
+                {},
+                'https://aigc-digitalhuman-api.zegotech.cn'
+            );
+            console.log("getDigitalHumanList result", result);
+            return result;
+        } catch (error) {
+            console.warn("调用 ZEGO 数字人列表接口异常，使用默认形象列表:", error);
+            return {
+                Code: 0,
+                Data: {
+                    List: [
+                        { DigitalHumanId: '20be9bfb-ef6b-4d63-8c3b-1f20077599c5', Name: '默认数字人形象（经典女性）' }
+                    ]
+                }
+            };
+        }
+    }
 }
