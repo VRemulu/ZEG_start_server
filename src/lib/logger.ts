@@ -1,12 +1,10 @@
-/**
- * 日志等级枚举
- */
-export enum LogLevel {
-    DEBUG = 'DEBUG',
-    INFO = 'INFO',
-    WARN = 'WARN',
-    ERROR = 'ERROR'
-  }
+export const LogLevel = {
+  DEBUG: 'DEBUG',
+  INFO: 'INFO',
+  WARN: 'WARN',
+  ERROR: 'ERROR',
+} as const;
+export type LogLevel = typeof LogLevel[keyof typeof LogLevel];
   
   /**
    * 带日期打印的日志方法
@@ -21,10 +19,10 @@ export enum LogLevel {
     const timestamp = beijingTime.toISOString();
     
     // 判断第一个参数是否为日志等级
-    let level = LogLevel.INFO;
+    let level: LogLevel = LogLevel.INFO;
     let logArgs = args;
     
-    if (Object.values(LogLevel).includes(levelOrFirstArg as LogLevel)) {
+    if ((Object.values(LogLevel) as readonly string[]).includes(levelOrFirstArg)) {
       level = levelOrFirstArg as LogLevel;
     } else {
       // 如果第一个参数不是日志等级，则将其加入到打印参数中
