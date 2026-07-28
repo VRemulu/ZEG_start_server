@@ -269,7 +269,7 @@ export class ZegoAIAgent {
                  * 配合 emotion-markup.ts 中的 parseEmotionMarkup() 使用：
                  *  - 用户输入: （开心地说）今天天气真好呀
                  *  - 解析后:  [[{"context_texts":["开心地说"]}]]今天天气真好呀
-                 *  - ZEGO 提取 context_texts 并映射到火山 TTS 的 req_params.context_texts
+                 *  - ZEGO 提取 context_texts 并映射到火山 TTS 的 req_params.additions.context_texts
                  *  - 数字人用开心语气说 "今天天气真好呀"，元数据标签不被朗读
                  *
                  * 注意: 如果 ZEGO 未正确解析 [[...]]，FilterText 中的 [[/]] 规则作为兜底静默移除
@@ -282,7 +282,7 @@ export class ZegoAIAgent {
                     },
                     TTSParamPaths: [
                         {
-                            ParamPath: "req_params.context_texts",
+                            ParamPath: "req_params.additions.context_texts",
                             Source: "context_texts"
                         }
                     ]
