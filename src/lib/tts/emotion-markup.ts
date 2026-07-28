@@ -32,7 +32,7 @@ export function parseEmotionMarkup(input: string): EmotionMarkupResult {
 
   // 正则表达匹配开头包含的全角（）或半角 () 括号
   // 只匹配字符串最前面的第一组括号
-  const bracketRegex = /^(?:[（\(]([^（\)\(\)]+)[）\)])\s*(.*)/s;
+  const bracketRegex = /^(?:[（\(]([^（\)\(\)]+)[）\)])\s*([\s\S]*)/;
   const match = trimmed.match(bracketRegex);
 
   if (match) {
