@@ -229,3 +229,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 }
+
+export async function OPTIONS(): Promise<NextResponse> {
+  return NextResponse.json(
+    {},
+    {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      },
+    }
+  );
+}
