@@ -9,6 +9,7 @@ interface StartDigitalHumanRequest {
   user_id: string;
   room_id: string;
   user_stream_id: string;
+  voice_type?: string;
 }
 
 interface DigitalHumanResponse {
