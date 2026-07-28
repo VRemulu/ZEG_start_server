@@ -63,7 +63,8 @@ async function handleConcurrencyLimit(
   userId: string,
   roomConfig: any
 ): Promise<NextResponse> {
-  const fallbackResult = await assistant.createAgentInstance(agentId, userId, roomConfig);
+  const { LLM, TTS } = assistant.getDefaultAgentConfig();
+  const fallbackResult = await assistant.createAgentInstance(agentId, userId, roomConfig, LLM, TTS);
 
   const response: DigitalHumanResponse = {
     code: fallbackResult.Code,
@@ -160,13 +161,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ConfigId: config_id,
     };
 
-    // 创建数字人实例
+    // 获取最新的默认智能体配置
+    const { LLM, TTS } = assistant.getDefaultAgentConfig();
+
+    // 创建数字人实例（显式传入 LLM 和 TTS，强制覆盖音色）
     const result = await createDigitalHumanInstance(
       assistant,
       CONSTANTS.AGENT_ID,
       user_id,
       roomConfig,
-      digitalHumanConfig
+      digitalHumanConfig,
+      LLM,
+      TTS
     );
 
     // 处理结果
