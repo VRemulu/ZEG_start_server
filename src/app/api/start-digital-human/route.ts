@@ -135,6 +135,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       user_id,
       room_id,
       user_stream_id,
+      voice_type,
     } = body;
 
     // 生成随机ID for 智能体
@@ -163,6 +164,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // 获取最新的默认智能体配置
     const { LLM, TTS } = assistant.getDefaultAgentConfig();
+
+    // 如果前端指定了音色，则动态覆盖 TTS 音色配置
+    if (voice_type && typeof voice_type === 'string' && voice_type.trim()) {
+      const selectedVoice = voice_type.trim();
+      if (TTS.Vendor === 'ByteDanceV3') {
+        TTS.Params.req_params.speaker = selectedVoice;
+      } else {
+        if (!TTS.Params.audio) {
+          TTS.Params.audio = {};
+        }
+        TTS.Params.audio.voice_type = selectedVoice;
+      }
+    }
 
     // 创建数字人实例（显式传入 LLM 和 TTS，强制覆盖音色）
     const result = await createDigitalHumanInstance(
