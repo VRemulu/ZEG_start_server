@@ -19,6 +19,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const assistant = ZegoAIAgent.getInstance();
+    const vendor = process.env.TTS_VENDOR || 'ByteDance';
 
     if (type === 'welcome') {
       const defaultWelcome =
@@ -26,9 +27,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         '（亲切地说）您好！我是嘉信讯通数字人助手，请问有什么可以帮您？';
       const welcomeText = text || defaultWelcome;
       const parsed = parseEmotionMarkup(welcomeText);
+      const textToSend = (vendor === 'ByteDanceV3') ? parsed.zegoFormattedText : parsed.speechText;
       const result = await assistant.sendAgentInstanceTTS(
         instanceId,
-        parsed.zegoFormattedText,
+        textToSend,
         'High',
         'ClearAndInterrupt'
       );
@@ -51,9 +53,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     if (type === 'custom' && text) {
       const parsed = parseEmotionMarkup(text);
+      const textToSend = (vendor === 'ByteDanceV3') ? parsed.zegoFormattedText : parsed.speechText;
       const result = await assistant.sendAgentInstanceTTS(
         instanceId,
-        parsed.zegoFormattedText,
+        textToSend,
         'High',
         'ClearAndInterrupt'
       );
