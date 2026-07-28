@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ZegoAIAgent } from '@/lib/zego/aiagent';
 import { AgentStore } from '@/lib/store';
+import { parseEmotionMarkup } from '@/lib/tts/emotion-markup';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
@@ -20,13 +21,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const assistant = ZegoAIAgent.getInstance();
 
     if (type === 'welcome') {
-      const welcomeText =
-        text ||
+      const defaultWelcome =
         process.env.WELCOME_TEXT ||
-        '您好！我是嘉信讯通数字人助手，请问有什么可以帮您？';
+        '（亲切地说）您好！我是嘉信讯通数字人助手，请问有什么可以帮您？';
+      const welcomeText = text || defaultWelcome;
+      const parsed = parseEmotionMarkup(welcomeText);
       const result = await assistant.sendAgentInstanceTTS(
         instanceId,
-        welcomeText,
+        parsed.zegoFormattedText,
         'High',
         'ClearAndInterrupt'
       );
@@ -48,9 +50,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     if (type === 'custom' && text) {
+      const parsed = parseEmotionMarkup(text);
       const result = await assistant.sendAgentInstanceTTS(
         instanceId,
-        text,
+        parsed.zegoFormattedText,
         'High',
         'ClearAndInterrupt'
       );

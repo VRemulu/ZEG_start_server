@@ -4,6 +4,7 @@ import { isEqual } from '@/lib/object';
 const SYSTEM_PROMPT = `
 请严格遵循后台附加在用户问题后的“回答要求”，用友好、简洁、口语化的自然段回答，内容应适合数字人直接语音播报。
 只输出纯文本，不要使用 Markdown、标题符号、加粗符号、项目符号、编号列表、表格、代码块、链接格式或 emoji。
+如果需要调整表达语气，可以在回答的最开头使用全角括号注明语气，例如：（亲切地说）或（严肃地说）。如果使用默认语气，则不需要添加括号。
 企业业务问题只能依据后台提供的参考资料回答；资料不足时说明无法从现有资料确认，不得编造。
 通用问题应直接使用稳定的通用知识回答，不要提及知识库、内部资料或检索过程。涉及当前开放状态、实时票价、天气或交通管制时，不得把静态知识当作实时事实。
 不要在用户问题已经明确时机械地追加“是否需要更多内容”等反问。
@@ -218,14 +219,30 @@ export class ZegoAIAgent {
     }
 
     getDefaultAgentConfig() {
-        return {
-            LLM: {
-                Url: process.env.LLM_BASE_URL || "",
-                ApiKey: process.env.LLM_API_KEY || "",
-                Model: process.env.LLM_MODEL || "",
-                SystemPrompt: SYSTEM_PROMPT
-            },
-            TTS: {
+        const vendor = process.env.TTS_VENDOR || "ByteDance";
+        let ttsConfig: any;
+
+        if (vendor === "ByteDanceV3") {
+            ttsConfig = {
+                Vendor: "ByteDanceV3",
+                Params: {
+                    "app": {
+                        "appid": process.env.TTS_BYTEDANCE_APP_ID || "zego_test",
+                        "token": process.env.TTS_BYTEDANCE_TOKEN || "zego_test",
+                        "resource_id": process.env.TTS_BYTEDANCE_RESOURCE_ID || "seed-tts-2.0"
+                    },
+                    "req_params": {
+                        "speaker": process.env.TTS_BYTEDANCE_VOICE_TYPE || "zh_female_vv_uranus_bigtts"
+                    }
+                },
+                FilterText: [
+                    { BeginCharacters: "(", EndCharacters: ")" },
+                    { BeginCharacters: "（", EndCharacters: "）" },
+                    { BeginCharacters: "{", EndCharacters: "}" }
+                ]
+            };
+        } else {
+            ttsConfig = {
                 Vendor: "ByteDance",
                 Params: {
                     "app": {
@@ -239,11 +256,25 @@ export class ZegoAIAgent {
                     "emotion": "happy",
                     "audio": {
                         "rate": 24000,
-                        "voice_type": process.env.TTS_BYTEDANCE_VOICE_TYPE || ""
+                        "voice_type": process.env.TTS_BYTEDANCE_VOICE_TYPE || "zh_female_linjianvhai_moon_bigtts"
                     }
                 },
-                FilterText: [{ BeginCharacters: "(", EndCharacters: ")" }, { BeginCharacters: "（", EndCharacters: "）" }, { BeginCharacters: "{", EndCharacters: "}" }],
+                FilterText: [
+                    { BeginCharacters: "(", EndCharacters: ")" },
+                    { BeginCharacters: "（", EndCharacters: "）" },
+                    { BeginCharacters: "{", EndCharacters: "}" }
+                ]
+            };
+        }
+
+        return {
+            LLM: {
+                Url: process.env.LLM_BASE_URL || "",
+                ApiKey: process.env.LLM_API_KEY || "",
+                Model: process.env.LLM_MODEL || "",
+                SystemPrompt: SYSTEM_PROMPT
             },
+            TTS: ttsConfig,
             ASR: {
                 Params: {}
             }
