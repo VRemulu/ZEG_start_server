@@ -61,10 +61,38 @@ export interface FilterText {
     BeginCharacters: string;
     EndCharacters: string;
 }
+
+/**
+ * ByteDanceV3 TTS 情绪控制高级配置
+ *
+ * 告诉 ZEGO 如何从 LLM 输出的文本中解析 [[{"context_texts":["开心地说"]}]] 元数据标签，
+ * 并将解析到的情绪参数（如 context_texts）映射到火山引擎 TTS 的对应参数路径，
+ * 从而实现逐句动态调整数字人语气（开心/温柔/严肃等）。
+ *
+ * 只有 Vendor="ByteDanceV3" 时才需要使用此配置。
+ *
+ * @see https://doc-zh.zego.im/aiagent-server/advanced/controlling-tts-effects
+ */
+export interface AdvancedConfig {
+    /** 元数据标签解析规则：定义标签的起止边界 */
+    LLMMetaInfo: {
+        Enabled: boolean;    // 是否启用元数据标签解析
+        StartMark: string;   // 起始标记，通常为 "[[" 
+        EndMark: string;     // 结束标记，通常为 "]]"
+    };
+    /** 参数路径映射：将元数据 JSON 中的字段映射到火山 TTS req_params 路径 */
+    TTSParamPaths: Array<{
+        ParamPath: string;   // 火山 TTS 参数路径，如 "req_params.context_texts"
+        Source: string;      // 元数据 JSON 中的字段名，如 "context_texts"
+    }>;
+}
+
 export interface TTSConfig {
     Vendor: string;
     Params?: any;
     FilterText?: FilterText[];
+    /** ByteDanceV3 情绪控制高级配置（仅 Vendor="ByteDanceV3" 时生效） */
+    AdvancedConfig?: AdvancedConfig;
 }
 
 export interface ASRConfig {
@@ -235,10 +263,36 @@ export class ZegoAIAgent {
                         "speaker": process.env.TTS_BYTEDANCE_VOICE_TYPE || "zh_female_vv_uranus_bigtts"
                     }
                 },
+                /**
+                 * 【情绪控制核心】告诉 ZEGO 如何解析 [[{"context_texts":["开心地说"]}]] 格式标签
+                 *
+                 * 配合 emotion-markup.ts 中的 parseEmotionMarkup() 使用：
+                 *  - 用户输入: （开心地说）今天天气真好呀
+                 *  - 解析后:  [[{"context_texts":["开心地说"]}]]今天天气真好呀
+                 *  - ZEGO 提取 context_texts 并映射到火山 TTS 的 req_params.context_texts
+                 *  - 数字人用开心语气说 "今天天气真好呀"，元数据标签不被朗读
+                 *
+                 * 注意: 如果 ZEGO 未正确解析 [[...]]，FilterText 中的 [[/]] 规则作为兜底静默移除
+                 */
+                AdvancedConfig: {
+                    LLMMetaInfo: {
+                        Enabled: true,
+                        StartMark: "[[",
+                        EndMark: "]]"
+                    },
+                    TTSParamPaths: [
+                        {
+                            ParamPath: "req_params.context_texts",
+                            Source: "context_texts"
+                        }
+                    ]
+                },
                 FilterText: [
                     { BeginCharacters: "(", EndCharacters: ")" },
                     { BeginCharacters: "（", EndCharacters: "）" },
-                    { BeginCharacters: "{", EndCharacters: "}" }
+                    { BeginCharacters: "{", EndCharacters: "}" },
+                    // 安全兜底：如果 AdvancedConfig 未生效，防止 [[...]] 元数据被当作正文朗读
+                    { BeginCharacters: "[[", EndCharacters: "]]" }
                 ]
             };
         } else {
